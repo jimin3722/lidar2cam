@@ -3,10 +3,6 @@ import math
 
 def rotationMtx(roll, pitch, yaw):
     # Roll, pitch, yaw 값을 라디안으로 변환
-    # roll = np.radians(roll)
-    # pitch = np.radians(pitch)
-    # yaw = np.radians(yaw)
-    
     # 회전 행렬 생성
     Rx = np.array([[1, 0, 0, 0],
                    [0, np.cos(roll), -np.sin(roll), 0],
@@ -35,30 +31,6 @@ def translationMtx(x,y,z):
                   [0,0,1,1]])
     return M
 
-# def transformMTX_lidar2cam(params_lidar, params_cam) :
-#     #Relative position of lidar w.r.t cam
-#     lidar_pos = [params_lidar.get (1) for i in (["X", "Y", "Z"]) ]
-#     cam_pos = [params_cam.get(1) for i in (["X" , "Y", "Z"])]
-#     x_rel = cam_pos[0] - lidar_pos[0]
-#     y_rel = cam_pos[1] - lidar_pos[1]
-#     z_rel = cam_pos[2] - lidar_pos[2]
-#     R_T = np.matmul(translationMtx(x_rel, y_rel, z_rel),rotationMtx(np.deg2rad(-90.), 0., 0.))
-#     R_T = np.matmul(R_T, rotationMtx(0, 0., np.deg2rad(-90.)))
-#     #rotate and translate the coordinate of a lidar
-#     RT = np.linalg.inv(R_T)
-#     return RT
-
-# def project2img_mtx(params_cam):
-#     fc_x = params_cam["HEIGHT"]/(2*np.tan(np.deg2rad(params_cam["FOV"]/2)))
-#     fc_y = params_cam["HEIGHT"]/(2*np.tan(np.deg2rad(params cam["FOV"]/2)))
-#     #the center of image
-#     cx = params_cam["WIDTH"]/2
-#     cy = params_cam ["HEIGHT"]/2
-#     #transformation matrix from 3D to 2D
-#     R_f = np.array([[fc_x, 0,     cx]
-#                     [0,    fc_y,  cy]])
-#     return R_f
-
 def transformMTX_lidar2cam():
     x_rel = 0.15
     y_rel = 0.00
@@ -72,15 +44,6 @@ def transformMTX_lidar2cam():
     R_T = np.matmul(R_T, rotationMtx(0, np.deg2rad(-1), 0))
     # R_T = np.matmul(R_T, rotationMtx(0, 0, np.deg2rad(0)))
 
-    # R_T = np.matmul(translationMtx(x_rel, y_rel, z_rel),rotationMtx(np.deg2rad(-90.), np.deg2rad(10.5),  np.deg2rad(-2)))
-    # R_T = np.matmul(R_T, rotationMtx(0.,np.deg2rad(87.5), 0.))
-    # R_T = np.matmul(R_T, rotationMtx(np.deg2rad(8),0, 0))
-
-    # R_T = np.matmul(translationMtx(x_rel, y_rel, z_rel),rotationMtx(np.deg2rad(90.), 0,  0))
-    # R_T = np.matmul(R_T, rotationMtx(0.,np.deg2rad(-90), 0.))
-    # R_T = np.matmul(translationMtx(x_rel, y_rel, z_rel),rotationMtx(np.deg2rad(-90.), 0., 0.))
-    # R_T = np.matmul(R_T, rotationMtx(0, 0., np.deg2rad(-90.)))
-    #rotate and translate the coordinate of a lidar
     RT = np.linalg.inv(R_T)
     return RT
 
