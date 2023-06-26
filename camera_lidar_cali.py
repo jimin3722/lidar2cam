@@ -116,7 +116,6 @@ class lidar2cam():
             # 텍스트 위치 계산
             # text_x = int(tuple(list(xyi2)[i][0] - text_size[0]) / 2)
             # text_y = int(tuple(xyi2[i][1] + text_size[1]) / 2)(text_x, text_y)
-            # 텍스트 그리기
             cv2.putText(img, text, tuple(xyi2[i]), font, scale, (255, 255, 255), thickness, cv2.LINE_AA)
 
         try:
