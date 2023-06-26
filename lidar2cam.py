@@ -76,19 +76,26 @@ class LIDAR2CAMTransform:
         xyi = np.matmul(self.proj_mtx, np.concatenate([xn, yn, np.ones_like(xn)], axis=0))
         xyi = xyi[0:2,:].T
         if crop:
-            xyi = self.crop_pts(xyi)
+            xyi, idx = self.crop_pts(xyi)
         else:
             pass
-            xyi = self.crop_pts(xyi)
+            #xyi = self.crop_pts(xyi)
         xyi = xyi.astype('int32')
         xyi = xyi.astype('int32')
-        return xyi
+        return xyi, idx
 
     def crop_pts(self, xyi):
-        xyi = xyi[np.logical_and(xyi[:, 0]>=0, xyi[:, 0]<self.width), :]
-        xyi = xyi[np.logical_and(xyi[:, 1]>=0, xyi[:, 1]<self.height), :]
+        
+        idx = np.where((xyi[:, 0]>=0)& 
+                     (xyi[:, 0]<self.width)&
+                     (xyi[:, 1]>=0)&
+                     (xyi[:, 1]<self.height))
 
-        return xyi
+        xyi = xyi[idx[0]]
+        # xyi = xyi[np.logical_and(xyi[:, 0]>=0, xyi[:, 0]<self.width), :]
+        # xyi = xyi[np.logical_and(xyi[:, 1]>=0, xyi[:, 1]<self.height), :]
+
+        return xyi, idx[0]
 
 import math
 
