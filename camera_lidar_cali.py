@@ -39,12 +39,13 @@ class lidar2cam():
         self.img_msg = img_msg
 
     def lidar_callback(self, velodyne):
-        print("asdf")
+        print("----------lidar_come------------")
         # self.velodyne = velodyne
         self.obs_xyz=list(map(lambda x: list(x), pc2.read_points(velodyne , field_names=("x","y","z"),skip_nans=True)))
         self.lidar_input_flag = True
 
     def project_point_cloud(self):
+
         now_time = time.time() 
         try:
             img = CV_BRIDGE.imgmsg_to_cv2(self.img_msg, 'bgr8')
@@ -61,12 +62,15 @@ class lidar2cam():
                         (points3D[:, 2] < 6) &
                         (points3D[:, 0] < 4) &
                         (points3D[:, 0] > 0.1) &
-                        (np.abs(points3D[:, 1]) < 4))
+                        (np.abs(points3D[:, 1]) < 3))
 
         points3D = points3D[inrange[0]]
 
+        print("len",len(points3D))
+
         # #voxel화 & roi설정    #########
-        points3D=list(map(lidar_module.voxel_roi_map,points3D))
+        # points3D=list(map(lidar_module.voxel_roi_map,points3D))
+        points3D=list(map(lidar_module.new_voxel_roi_map,points3D))
         points3D=list(set(points3D))
                       
         # #ransac 돌리기
@@ -87,6 +91,7 @@ class lidar2cam():
             cluster_points = points3D[labels == cluster]
             cluster_mean = np.mean(cluster_points, axis=0)
             cluster_means.append(cluster_mean)
+
         print("lol:",len(cluster_means))
 
         cluster_means = np.array(cluster_means)
@@ -112,10 +117,6 @@ class lidar2cam():
 
             vector = list(cluster_means[idx[i]])
             text = f"[{vector[0]:.2f}, {vector[1]:.2f}, {vector[2]:.2f}]"
-            # text_size, _ = cv2.getTextSize(text, font, scale, thickness)
-            # 텍스트 위치 계산
-            # text_x = int(tuple(list(xyi2)[i][0] - text_size[0]) / 2)
-            # text_y = int(tuple(xyi2[i][1] + text_size[1]) / 2)(text_x, text_y)
             cv2.putText(img, text, tuple(xyi2[i]), font, scale, (255, 255, 255), thickness, cv2.LINE_AA)
 
         try:
