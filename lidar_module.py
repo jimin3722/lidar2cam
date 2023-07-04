@@ -23,7 +23,7 @@ min_points=4 #한 군집을 만들 최소 포인트 개수 4
 
 #voxel 설정
 decimal=2 #소수점 n자리까지 데이터들을 반올림함, 따라서 데이터 간의 차이가 소수점 n+1자리수 보다 작다면 한 점으로 취급 
-delta=0.05 #데이터가 delta의 배수로 나타나짐  
+delta=0.01 #데이터가 delta의 배수로 나타나짐  
 
 #ransac 설정 https://gnaseel.tistory.com/33
 p_dist=0.1 #추출된 모델로부터 거리가 n이하이면 inlier로 취급함

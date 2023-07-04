@@ -34,14 +34,19 @@ def translationMtx(x,y,z):
 def transformMTX_lidar2cam():
     x_rel = 0.15
     y_rel = 0.00
-    z_rel = 0.10
+    z_rel = 0.00
     # x_rel = 0
     # y_rel = 0
     # z_rel = 0
+    # R_T = np.matmul(translationMtx(x_rel, y_rel, z_rel),rotationMtx(np.deg2rad(-90.), 0,  0))
+    # R_T = np.matmul(R_T, rotationMtx(0, np.deg2rad(90), 0))
+    # R_T = np.matmul(R_T, rotationMtx(np.deg2rad(4.), 0, 0))
+    # R_T = np.matmul(R_T, rotationMtx(0, np.deg2rad(-1), 0))
+    # # R_T = np.matmul(R_T, rotationMtx(0, 0, np.deg2rad(0)))
     R_T = np.matmul(translationMtx(x_rel, y_rel, z_rel),rotationMtx(np.deg2rad(-90.), 0,  0))
     R_T = np.matmul(R_T, rotationMtx(0, np.deg2rad(90), 0))
-    R_T = np.matmul(R_T, rotationMtx(np.deg2rad(4.), 0, 0))
-    R_T = np.matmul(R_T, rotationMtx(0, np.deg2rad(-1), 0))
+    R_T = np.matmul(R_T, rotationMtx(np.deg2rad(4.5), 0, 0))
+    R_T = np.matmul(R_T, rotationMtx(0, np.deg2rad(0.5), 0))
     # R_T = np.matmul(R_T, rotationMtx(0, 0, np.deg2rad(0)))
 
     RT = np.linalg.inv(R_T)
@@ -144,3 +149,4 @@ if __name__ == "__main__":
     print("Y 각도:", y_angle)
     print("Z 각도:", z_angle)
         
+
