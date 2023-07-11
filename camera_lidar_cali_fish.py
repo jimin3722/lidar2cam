@@ -26,21 +26,27 @@ TF_BUFFER = None
 CV_BRIDGE = CvBridge()
 
 # LC = LIDAR2CAMTransform(1280, 720, 44.5)
-LC = LIDAR2CAMTransform(640, 480, 79)
+LC = LIDAR2CAMTransform(640, 480, 78)
 
-fx = 345.570023
-fy = 345.570023
+fx = 345.727618
+fy = 346.002121
 cx = 320.000000
 cy = 240.000000
 w = -0.24000
+k1 = -0.320124
+k2 = 0.098598
+k3 = 0
+p1 = 0.001998
+p2 = 0.000177
 
 # 카메라 매트릭스
 camera_matrix = np.array([[fx, 0, cx],
-                         [0, fy, cy],
-                         [0, 0, 1]])
+                          [0, fy, cy],
+                          [0,  0,  1]])
 
 # 왜곡 계수
-dist_coeffs = np.array([w, 0, 0, 0, 0])
+dist_coeffs = np.array([k1, k2, k3, p1, p2])
+
 
 class lidar2cam():
     def __init__(self):
@@ -74,10 +80,11 @@ class lidar2cam():
         # 왜곡 보정
         img = cv2.undistort(img, camera_matrix, dist_coeffs, None)
 
-        
         # points3D =  np.asarray(self.obs_xyz)
         points3D = np.array(self.obs_xyz)
 
+
+        #######################################
         # Filter points in front of camera
         inrange = np.where((points3D[:, 2] > -2) &
                         (points3D[:, 2] < 6) &
@@ -86,6 +93,8 @@ class lidar2cam():
                         (np.abs(points3D[:, 1]) < 3))
 
         points3D = points3D[inrange[0]]
+        #######################################
+
 
         print("len",len(points3D))
 
@@ -117,12 +126,16 @@ class lidar2cam():
 
         cluster_means = np.array(cluster_means)
 
+
+        #######################################
         #input : np.array
         xyc = LC.transform_lidar2cam(points3D)
         xyi, _ = LC.project_pts2ing(xyc) 
 
         xyc2 = LC.transform_lidar2cam(cluster_means)
         xyi2, idx = LC.project_pts2ing(xyc2) 
+        #######################################
+
 
         print("hihi:",cluster_means[idx])
         
