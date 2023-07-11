@@ -18,7 +18,8 @@ import lidar_module
 import rospy
 from cv_bridge import CvBridge, CvBridgeError
 from tf2_sensor_msgs.tf2_sensor_msgs import do_transform_cloud
-from sensor_msgs.msg import Image, PointCloud2
+from sensor_msgs.msg import Image, PointCloud2, PointCloud
+from geometry_msgs.msg import Point32
 import sensor_msgs.point_cloud2 as pc2
 
 # Global variables
@@ -52,9 +53,12 @@ class lidar2cam():
     def __init__(self):
         self.img_sub = rospy.Subscriber('/usb_cam/image_raw', Image, self.img_callback, queue_size = 1)
         self.lidar_sub = rospy.Subscriber('/velodyne_points', PointCloud2, self.lidar_callback, queue_size = 1)
+        self.cone_pub=rospy.Publisher('cone',PointCloud,queue_size=1)
+
         self.WEIGHT_PATH="/home/jimin/catkin_ws/src/lidar_camera_calibration/lidar2cam/best_ep_100.pt" # msi
         # self.WEIGHT_PATH = (os.path.dirname(os.path.abspath(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))))+"/pt/morai_last.pt"
         self.model = torch.hub.load('ultralytics/yolov5', 'custom', path = self.WEIGHT_PATH, force_reload=True)
+        
         self.lidar_input_flag = False
         self.velodyne = 0
         self.img_msg = 0
@@ -215,6 +219,18 @@ class lidar2cam():
             cv2.waitKey(1)
         except CvBridgeError as e: 
             rospy.logerr(e)
+
+        self.cones = PointCloud()
+        self.cones.header.frame_id='map'
+
+        for i in cone_centers:
+            point=Point32()
+            point.x=i[0]
+            point.y=i[1]
+            point.z=classified_cones[i]
+            self.cones.points.append(point)
+
+        self.cone_pub.publish(self.cones)
 
         print("realtime:",time.time()-now_time) 
 
