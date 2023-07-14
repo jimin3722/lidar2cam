@@ -5,13 +5,14 @@ from math import acos,sin,cos
 import random
 from sklearn.cluster import DBSCAN
 import multiprocessing
+from collections import defaultdict
 
 #location (4,0,0)
 #roi 설정
 floor_value=-5 #음수, 라이다 위치부터 아래 몇미터까지인지
 roof_value=13 #위 몇미터까지인지
-lenth=20 #몇미터 앞까지 볼건지
-width=11 #라이다로 볼 데이터의 폭 (2x라면 왼쪽으로x만큼 오른쪽으로 x만큼)
+lenth=10 #몇미터 앞까지 볼건지
+width=7 #라이다로 볼 데이터의 폭 (2x라면 왼쪽으로x만큼 오른쪽으로 x만큼)
 min_intensity=0 #라이다 데이터의 최소 강도 (현재 사용하지는 않음)
 back_lenth=0 #양수, 라이다기준 몇미터 뒤까지 볼건지
 
@@ -22,8 +23,8 @@ epsilon=0.2 #입실론 값 0.4
 min_points=4 #한 군집을 만들 최소 포인트 개수 4
 
 #voxel 설정
-decimal=2 #소수점 n자리까지 데이터들을 반올림함, 따라서 데이터 간의 차이가 소수점 n+1자리수 보다 작다면 한 점으로 취급 
-delta=0.01 #데이터가 delta의 배수로 나타나짐  
+decimal=1 #소수점 n자리까지 데이터들을 반올림함, 따라서 데이터 간의 차이가 소수점 n+1자리수 보다 작다면 한 점으로 취급 
+delta=0.03 #데이터가 delta의 배수로 나타나짐  
 
 #ransac 설정 https://gnaseel.tistory.com/33
 p_dist=0.1 #추출된 모델로부터 거리가 n이하이면 inlier로 취급함
@@ -108,7 +109,7 @@ def ransac(input_data):
                 best_weight_list=weight_list 
 
     best_no_land_model=input_array[best_weight_list]
-    return best_no_land_model, best_weight_list
+    return best_no_land_model#intensity쓸때 활성화, best_weight_list
 
 
 def z_compressor(input_data):
@@ -123,7 +124,7 @@ def dbscan(input_data):
     #eps과 min_points가 입력된 모델 생성
     model=DBSCAN(eps=epsilon, min_samples=min_points)
     #데이터를 라이브러리가 읽을 수 있게 np array로 변환
-    DB_Data=array(input_data)
+    DB_Data=np.array(input_data,dtype=object)
     #모델 예측
     labels=model.fit_predict(DB_Data)
     k=0
@@ -141,7 +142,7 @@ def intensity_dbscan(input_data,intensity_list):
     #eps과 min_points가 입력된 모델 생성
     model=DBSCAN(eps=epsilon, min_samples=min_points)
     #데이터를 라이브러리가 읽을 수 있게 np array로 변환
-    DB_Data=array(input_data)
+    DB_Data=np.array(input_data, dtype=object)
     #모델 예측
     labels=model.fit_predict(DB_Data)
     k=0
@@ -157,12 +158,46 @@ def intensity_dbscan(input_data,intensity_list):
         k+=1
     return no_noise_model, no_noise_label, no_noise_intensity
 
+def cone_detector(labels, points3D):
+    #cone_detect
+    label_points = defaultdict(list)
+    for l, p in zip(points3D, labels):
+        label_points[l].append(p)
+
+    cone_centers=[]
+    for i in label_points:
+        cone_points=label_points.get(i)
+        x_list=[]
+        y_list=[]
+        z_list=[]
+        for k in cone_points:
+            x_list.append(k[0])
+            y_list.append(k[1])
+            z_list.append(k[2])
+        x_range=max(x_list)-min(x_list)
+        y_range=max(y_list)-min(y_list)
+        z_range=max(z_list)-min(z_list)
+        
+        if x_range>0.05 and x_range<0.55 and y_range>0.05 and y_range<0.55 and z_range>0.05 and z_range<1:
+            x_mean=sum(x_list)/len(x_list)
+            y_mean=sum(y_list)/len(y_list)
+            z_mean=sum(z_list)/len(z_list)
+            cone_centers.append([x_mean,y_mean,z_mean])
+        elif max(x_list)<3 and x_range>0.05 and x_range<0.55 and y_range>0.05 and y_range<0.55 and z_range<x_range/4 and z_range>0.05:
+            x_mean=sum(x_list)/len(x_list)
+            y_mean=sum(y_list)/len(y_list)
+            z_mean=sum(z_list)/len(z_list)
+            cone_centers.append([x_mean,y_mean,z_mean])
+            
+    return cone_centers  
+
+
 def tf2tm(no_z_points,x,y,heading):
     obs_tm=np.empty((1,3))
     T = [[cos(heading), -1*sin(heading), x], \
             [sin(heading),  cos(heading), y], \
             [      0     ,      0       , 1]] 
     for point in no_z_points:
-        obs_tm = np.append(obs_tm,[dot(T,transpose([point.x+4, point.y,1]))],axis=0) # point[0] -> 객체를 subscribe할 수 없음 오류
+        obs_tm = np.append(obs_tm,[dot(T,transpose([point[0]+1, point[1],1]))],axis=0) # point[0] -> 객체를 subscribe할 수 없음 오류
     obs_tm[:,2]=0
     return obs_tm

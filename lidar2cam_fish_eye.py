@@ -42,7 +42,7 @@ def transformMTX_lidar2cam():
     R_T = np.matmul(R_T, rotationMtx(0, np.deg2rad(90), 0))
     
     R_T = np.matmul(R_T, rotationMtx(np.deg2rad(4.5), 0, 0))
-    R_T = np.matmul(R_T, rotationMtx(0, np.deg2rad(0.5), 0))
+    R_T = np.matmul(R_T, rotationMtx(0, np.deg2rad(-0.5), 0))
     # R_T = np.matmul(R_T, rotationMtx(0, 0, np.deg2rad(0)))
 
     RT = np.linalg.inv(R_T)

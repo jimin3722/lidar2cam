@@ -6,18 +6,16 @@ import torch
 import os
 import sys
 import time
-from collections import defaultdict
 
 # External modules  
 import cv2
 import numpy as np
 
-from lidar2cam_fish import LIDAR2CAMTransform
+from lidar2cam_fish_eye import LIDAR2CAMTransform
 import lidar_module
 
 import rospy
 from cv_bridge import CvBridge, CvBridgeError
-from tf2_sensor_msgs.tf2_sensor_msgs import do_transform_cloud
 from sensor_msgs.msg import Image, PointCloud2, PointCloud
 from geometry_msgs.msg import Point32
 import sensor_msgs.point_cloud2 as pc2
@@ -27,14 +25,14 @@ TF_BUFFER = None
 CV_BRIDGE = CvBridge()
 
 # LC = LIDAR2CAMTransform(1280, 720, 44.5)
-LC = LIDAR2CAMTransform(640, 480, 78)
+LC = LIDAR2CAMTransform(640, 480, 77)
 
 fx = 345.727618
 fy = 346.002121
 cx = 320.000000
 cy = 240.000000
 w = -0.24000
-k1 = -0.320124
+k1 = -0.350124
 k2 = 0.098598
 k3 = 0
 p1 = 0.001998
@@ -49,7 +47,8 @@ camera_matrix = np.array([[fx, 0, cx],
 dist_coeffs = np.array([k1, k2, k3, p1, p2])
 
 
-class lidar2cam():
+class Cone_Classifier():
+
     def __init__(self):
         self.img_sub = rospy.Subscriber('/usb_cam/image_raw', Image, self.img_callback, queue_size = 1)
         self.lidar_sub = rospy.Subscriber('/velodyne_points', PointCloud2, self.lidar_callback, queue_size = 1)
@@ -60,7 +59,6 @@ class lidar2cam():
         self.model = torch.hub.load('ultralytics/yolov5', 'custom', path = self.WEIGHT_PATH, force_reload=True)
         
         self.lidar_input_flag = False
-        self.velodyne = 0
         self.img_msg = 0
     
     def img_callback(self, img_msg):
@@ -68,13 +66,26 @@ class lidar2cam():
 
     def lidar_callback(self, velodyne):
         print("----------lidar_come------------")
-        # self.velodyne = velodyne
         self.obs_xyz=list(map(lambda x: list(x), pc2.read_points(velodyne , field_names=("x","y","z"),skip_nans=True)))
         self.lidar_input_flag = True
 
-    def project_point_cloud(self):
+    def pub_cone(self, cone_centers, classified_cones):
+        cones = PointCloud()
+        cones.header.frame_id='map'
+
+        for idx ,i in enumerate(cone_centers):
+            point=Point32()
+            point.x=i[0]
+            point.y=i[1]
+            point.z=classified_cones[idx]
+            cones.points.append(point)
+
+        self.cone_pub.publish(cones)
+
+    def cone_classifier(self):
 
         now_time = time.time() 
+
         try:
             img = CV_BRIDGE.imgmsg_to_cv2(self.img_msg, 'bgr8')
             # img = np.frombuffer(self.img_msg.data, dtype=np.uint8).reshape(self.img_msg.height, self.img_msg.width, -1)
@@ -122,7 +133,6 @@ class lidar2cam():
         points3D = points3D[inrange[0]]
 
         # #voxel화 & roi설정    #########
-        # points3D=list(map(lidar_module.voxel_roi_map,points3D))
         points3D=list(map(lidar_module.new_voxel_roi_map,points3D))
         points3D=list(set(points3D))
                       
@@ -130,40 +140,12 @@ class lidar2cam():
         points3D=lidar_module.ransac(points3D)
 
         #z값 압축
-        points3D=lidar_module.z_compressor(points3D[0])
+        points3D=lidar_module.z_compressor(points3D)
 
         #DBSCAN 돌리기
-        points3D,labels = lidar_module.dbscan(points3D)
+        points3D,labels = lidar_module.dbscan(points3D) 
 
-        # cone_detect
-        label_points = defaultdict(list)
-        for l, p in zip(labels, points3D):
-            label_points[l].append(p)
-
-        cone_centers=[]
-        for i in label_points:
-            cone_points=label_points.get(i)
-            x_list=[]
-            y_list=[]
-            z_list=[]
-            for k in cone_points:
-                x_list.append(k[0])
-                y_list.append(k[1])
-                z_list.append(k[2])
-            x_range=max(x_list)-min(x_list)
-            y_range=max(y_list)-min(y_list)
-            z_range=max(z_list)-min(z_list)
-            
-            if x_range>0.05 and x_range<0.55 and y_range>0.05 and y_range<0.55 and z_range>0.05 and z_range<1:
-                x_mean=sum(x_list)/len(x_list)
-                y_mean=sum(y_list)/len(y_list)
-                z_mean=sum(z_list)/len(z_list)
-                cone_centers.append([x_mean,y_mean,z_mean])
-            elif max(x_list)<3 and x_range>0.05 and x_range<0.55 and y_range>0.05 and y_range<0.55 and z_range<x_range/4 and z_range>0.05:
-                x_mean=sum(x_list)/len(x_list)
-                y_mean=sum(y_list)/len(y_list)
-                z_mean=sum(z_list)/len(z_list)
-                cone_centers.append([x_mean,y_mean,z_mean])   
+        cone_centers = lidar_module.cone_detector(points3D, labels)
 
         # rubber cones coordinate
         cones = np.array(cone_centers)
@@ -171,8 +153,8 @@ class lidar2cam():
         classified_cones = np.zeros(cones.shape[0], dtype=int)
 
         xyc2 = LC.transform_lidar2cam(cones)
+
         projected_cones, cone_idx = LC.project_pts2ing(xyc2) 
-        print("idx",cone_idx)
 
         for idx, projected_cone in zip(cone_idx, projected_cones):
 
@@ -181,7 +163,7 @@ class lidar2cam():
             for img_cone in img_cones:
 
                 img_cone_vector = [ int((img_cone[0]+img_cone[2])/2), int((img_cone[1]+img_cone[3])/2) ]
-                cv2.circle(img, tuple((int((img_cone[0]+img_cone[2])/2), int((img_cone[1]+img_cone[3])/2))), 5, (0,0,255), -1)
+                cv2.circle(img, tuple((int((img_cone[0]+img_cone[2])/2), int((img_cone[1]+img_cone[3])/2))), 4, (0,0,255), -1)
                 distance = np.linalg.norm(projected_cone - img_cone_vector)
                
                 if closest_dist > distance:
@@ -198,21 +180,17 @@ class lidar2cam():
 
         print("cc",classified_cones)
 
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        scale = 0.6
-        thickness = 2
-
         for i in range(len(projected_cones)):
 
             if classified_cones[cone_idx[i]] == 1: 
                 cv2.circle(img, tuple(projected_cones[i]), 7, (255,0,0), -1)
             elif classified_cones[cone_idx[i]] == 2: 
-                cv2.circle(img, tuple(projected_cones[i]), 7, (20,255,255), -1)
+                cv2.circle(img, tuple(projected_cones[i]), 7, (70,255,255), -1)
             else: 
                 cv2.circle(img, tuple(projected_cones[i]), 7, (255,255,255), -1)
             vector = list(cones[i])
             text = f"[{vector[0]:.2f}, {vector[1]:.2f}, {vector[2]:.2f}]"
-            #cv2.putText(img, text, tuple(projected_cones[i]), font, scale, (255, 255, 255), thickness, cv2.LINE_AA)
+            #cv2.putText(img, text, tuple(projected_cones[i]), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2, cv2.LINE_AA)
         
         try:
             cv2.imshow('sss' ,img)
@@ -220,26 +198,19 @@ class lidar2cam():
         except CvBridgeError as e: 
             rospy.logerr(e)
 
-        self.cones = PointCloud()
-        self.cones.header.frame_id='map'
-
-        for i in cone_centers:
-            point=Point32()
-            point.x=i[0]
-            point.y=i[1]
-            point.z=classified_cones[i]
-            self.cones.points.append(point)
-
-        self.cone_pub.publish(self.cones)
+        self.pub_cone(cone_centers, classified_cones)
 
         print("realtime:",time.time()-now_time) 
 
 if __name__ == '__main__':
     
-    rospy.init_node('lidar_camera_node')
-    lc = lidar2cam()
+    rospy.init_node('Cone_Classfier')
+
+    CC = Cone_Classifier()
+
     rospy.sleep(1)
+
     while not rospy.is_shutdown():
-        if lc.lidar_input_flag == True:
-            lc.project_point_cloud()
-            lc.lidar_input_flag = False
+        if CC.lidar_input_flag == True:
+            CC.cone_classifier()
+            CC.lidar_input_flag = False
